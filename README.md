@@ -1,4 +1,4 @@
-# VSL webapplication
+# SceneSwitcher webapplication
 
 ## Getting started
 
