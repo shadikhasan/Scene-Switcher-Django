@@ -1,0 +1,201 @@
+<!-- templates/video_processing.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scene Optimisation Bot - Video Editor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 900px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        p.instructions {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+
+        .video-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        video {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .spinner {
+            display: none;
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script>
+        function getSceneIndex(currentTime) {
+            fetch(`/get_srt_index?time=${currentTime}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.srt_index !== -1) {
+                        var newFileInput = document.createElement('input');
+                        newFileInput.type = 'file';
+                        newFileInput.accept = 'video/*';
+                        newFileInput.onchange = function(event) {
+                            var file = event.target.files[0];
+
+                            let formData = new FormData();
+                            formData.append('scene', file);
+                            formData.append('srt_index', data.srt_index);
+
+                            fetch('/upload_new_scene', {
+                                method: 'POST',
+                                body: formData
+                            }).then(response => {
+                                if (response.ok) {
+                                    alert('Segment uploaded and stored for replacement.');
+                                } else                                    alert('Failed to upload the segment.');
+                                }
+                            });
+                        };
+                        newFileInput.click();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+        
+        function processSegments() {
+            document.getElementById('spinner').style.display = 'block';  // Show the spinner
+            fetch('/process_video', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            }).then(response => {
+                document.getElementById('spinner').style.display = 'none';  // Hide the spinner
+                if (response.ok) {
+                    // Append a timestamp to the video source URL to force reload
+                    let videoPlayer = document.getElementById("videoPlayer");
+                    let newVideoSrc = `/uploads/original_video.mp4?timestamp=${new Date().getTime()}`;
+                    videoPlayer.src = newVideoSrc;
+                    videoPlayer.load();
+                    alert('Video compiled and segments replaced successfully!');
+
+                    // Create a download button for the user to download the processed video
+                    let downloadButton = document.createElement('a');
+                    downloadButton.href = newVideoSrc;
+                    downloadButton.download = 'processed_video.mp4';
+                    downloadButton.className = 'btn btn-primary';
+                    downloadButton.textContent = 'Download Processed Video';
+
+                    let container = document.querySelector('.container');
+                    container.appendChild(downloadButton);
+                } else {
+                    alert('Failed to compile and replace segments.');
+                }
+            }).catch(error => {
+                document.getElementById('spinner').style.display = 'none';  // Hide the spinner
+                console.error('Error during processing:', error);
+                alert('An error occurred during processing.');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var videoPlayer = document.getElementById('videoPlayer');
+            videoPlayer.addEventListener('click', function(event) {
+                if (event.shiftKey) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    getSceneIndex(videoPlayer.currentTime);
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>Video Editor</h1>
+    <p class="instructions">
+        Use this video editor to replace segments of the video. <br>
+        <strong>Instructions:</strong> <br>
+        - Play the video and pause it at the point you want to replace. <br>
+        - Hold <strong>Shift</strong> and click on the video to choose a new video segment to upload and replace the current segment.
+    </p>
+    <div class="video-container">
+        <video id="videoPlayer" controls>
+            <source src="/uploads/original_video.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <div id="spinner" class="spinner"></div> <!-- Loading Spinner -->
+    <button class="btn btn-success" onclick="processSegments()">Process</button>
+</div>
+</body>
+</html>
+
+

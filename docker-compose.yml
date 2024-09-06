@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  # Django application service
+  app:
+    build: .  # Build context for the Django application
+    command: >
+      sh -c "
+      python manage.py wait_for_db &&
+      python manage.py makemigrations &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000
+      "  # Command to run when the container starts
+    ports:
+      - "8000:8000"  # Mapping port 8000 on the host to port 8000 in the container
+    volumes:
+      - .:/app  # Mounting the project directory into the /app directory in the container
+    environment: 
+      - DB_HOST=db  # Environment variables for database connection settings
+      - DB_NAME=testdb
+      - DB_USER=postgres
+      - DB_PASS=ss
+    depends_on:
+      - db  # Dependency on the db service
+
+  # PostgreSQL database service
+  db:
+    image: postgres:latest  # Docker image for the PostgreSQL database
+    environment:
+      POSTGRES_DB: testdb  # Environment variables to configure PostgreSQL
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ss
+    ports:
+      - "5432:5432"  # Mapping port 5432 on the host to port 5432 in the container
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Mounting a volume for persistent data storage
+
+# Define a named volume for persistent storage of PostgreSQL data
+volumes:
+  postgres_data:
